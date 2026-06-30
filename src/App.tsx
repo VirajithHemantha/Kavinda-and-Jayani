@@ -231,8 +231,10 @@ function AdminPage() {
   const handleGenerate = () => {
     const url = new URL(window.location.origin);
     if (prefix || name) {
-      const data = { p: prefix, n: name };
-      const encoded = btoa(encodeURIComponent(JSON.stringify(data)));
+      // Use pipe delimiter instead of JSON for shorter length
+      const combined = `${prefix}|${name}`;
+      // Safe base64 encoding for Unicode
+      const encoded = btoa(unescape(encodeURIComponent(combined)));
       url.searchParams.set("t", encoded);
     }
     setGeneratedLink(url.toString());
@@ -311,11 +313,29 @@ function WeddingInvitation() {
   const token = searchParams.get("t");
   if (token) {
     try {
-      const decoded = JSON.parse(decodeURIComponent(atob(token)));
-      guestPrefix = decoded.p || "";
-      guestName = decoded.n || "";
+      // Decode base64 and safely handle Unicode
+      const decoded = decodeURIComponent(escape(atob(token)));
+      
+      // Check if it's the old JSON format (starts with {)
+      if (decoded.startsWith("{")) {
+        const parsed = JSON.parse(decoded);
+        guestPrefix = parsed.p || "";
+        guestName = parsed.n || "";
+      } else {
+        // New pipe-delimited format
+        const [p, ...n] = decoded.split("|");
+        guestPrefix = p || "";
+        guestName = n.join("|") || "";
+      }
     } catch (e) {
-      console.error("Failed to decode token", e);
+      // Fallback for older tokens that were generated differently
+      try {
+        const decoded = JSON.parse(decodeURIComponent(atob(token)));
+        guestPrefix = decoded.p || "";
+        guestName = decoded.n || "";
+      } catch (e2) {
+        console.error("Failed to decode token", e2);
+      }
     }
   }
 
